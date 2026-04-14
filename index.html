@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <!-- aframe-extras adds animation-mixer support for GLB animations -->
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
     <style>
       body {
@@ -106,13 +105,11 @@
       renderer="colorManagement: true; physicallyCorrectLights: true;">
 
       <a-assets timeout="30000">
-        <!-- Preload the GLB model -->
         <a-asset-item id="arModel" src="./assets/model.glb"></a-asset-item>
       </a-assets>
 
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- Lighting so the model renders correctly -->
       <a-light type="ambient"     color="#ffffff" intensity="0.8"></a-light>
       <a-light type="directional" color="#ffffff" intensity="1.2" position="1 2 1"></a-light>
 
@@ -125,6 +122,7 @@
           rotation="90 0 0"
           scale="10 10 10"
           animation-mixer="clip: *; loop: repeat"
+          animation="property: rotation; to: 90 360 0; loop: true; dur: 8000; easing: linear"
           visible="false">
         </a-gltf-model>
       </a-entity>
@@ -151,7 +149,7 @@
 
         const maxDim = Math.max(size.x, size.y, size.z);
         if (maxDim > 0) {
-          const targetSize = 0.8;          // world units; tweak to taste
+          const targetSize = 0.8;
           const factor = targetSize / maxDim;
           modelEntity.setAttribute('scale', `${factor} ${factor} ${factor}`);
         }
@@ -162,7 +160,6 @@
         scanOverlay.classList.add('hidden');
         modelEntity.setAttribute('visible', 'true');
 
-        // Resume built-in animations if any
         const mixer = modelEntity.components['animation-mixer'];
         if (mixer) mixer.play();
       });
