@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WebAR 3D Model Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- aframe-extras adds animation-mixer support for GLB animations -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+      }
+
+      #scanOverlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s;
+      }
+
+      #scanOverlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .scan-container { text-align: center; max-width: 90%; }
+
+      .scan-title {
+        color: white;
+        font-size: 24px;
+        margin-bottom: 30px;
+        font-weight: 300;
+        letter-spacing: 1px;
+      }
+
+      .target-preview {
+        position: relative;
+        width: 280px; height: 280px;
+        margin: 0 auto 20px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 0 30px rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.1);
+      }
+
+      .target-image {
+        width: 100%; height: 100%;
+        object-fit: contain;
+        opacity: 0.4;
+        filter: blur(1px);
+      }
+
+      .scan-animation {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 3px;
+        background: linear-gradient(90deg,
+          transparent 0%,
+          rgba(76,175,80,0.8) 50%,
+          transparent 100%);
+        animation: scan 2s ease-in-out infinite;
+        box-shadow: 0 0 20px rgba(76,175,80,0.8);
+      }
+
+      @keyframes scan {
+        0%  { transform: translateY(0); }
+        50% { transform: translateY(277px); }
+        100%{ transform: translateY(0); }
+      }
+
+      .scan-instruction {
+        color: rgba(255,255,255,0.8);
+        font-size: 16px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- Scan Overlay -->
+    <div id="scanOverlay">
+      <div class="scan-container">
+        <h2 class="scan-title">Scan the Image</h2>
+        <div class="target-preview">
+          <img id="previewImg" src="./assets/target_image.jpg" alt="Target" class="target-image">
+          <div class="scan-animation"></div>
+        </div>
+        <p class="scan-instruction">Point your camera at this image</p>
+      </div>
+    </div>
+
+    <a-scene
+      mindar-image="imageTargetSrc: ./assets/targets.mind; filterMinCF: 0.0001; filterBeta: 0.001;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+      renderer="colorManagement: true; physicallyCorrectLights: true;">
+
+      <a-assets timeout="30000">
+        <!-- Preload the GLB model -->
+        <a-asset-item id="arModel" src="./assets/model.glb"></a-asset-item>
+      </a-assets>
+
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <!-- Lighting so the model renders correctly -->
+      <a-light type="ambient"     color="#ffffff" intensity="0.8"></a-light>
+      <a-light type="directional" color="#ffffff" intensity="1.2" position="1 2 1"></a-light>
+
+      <!-- 3D model anchored to the image target -->
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-gltf-model
+          id="arModelEntity"
+          src="#arModel"
+          position="0 0 0"
+          rotation="90 0 0"
+          scale="10 10 10"
+          animation-mixer="clip: *; loop: repeat"
+          visible="false">
+        </a-gltf-model>
+      </a-entity>
+
+    </a-scene>
+
+    <script>
+      const scanOverlay = document.getElementById('scanOverlay');
+      const previewImg  = document.getElementById('previewImg');
+      const modelEntity = document.getElementById('arModelEntity');
+      const targetEl    = document.querySelector('[mindar-image-target]');
+
+      // Hide broken preview image gracefully
+      previewImg.onerror = () => { previewImg.style.display = 'none'; };
+
+      // Auto-scale model to fit neatly over the target card (~0.8 units wide)
+      modelEntity.addEventListener('model-loaded', () => {
+        const mesh = modelEntity.getObject3D('mesh');
+        if (!mesh) return;
+
+        const box  = new THREE.Box3().setFromObject(mesh);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim > 0) {
+          const targetSize = 0.8;          // world units; tweak to taste
+          const factor = targetSize / maxDim;
+          modelEntity.setAttribute('scale', `${factor} ${factor} ${factor}`);
+        }
+      });
+
+      // Target detected → show model
+      targetEl.addEventListener('targetFound', () => {
+        scanOverlay.classList.add('hidden');
+        modelEntity.setAttribute('visible', 'true');
+
+        // Resume built-in animations if any
+        const mixer = modelEntity.components['animation-mixer'];
+        if (mixer) mixer.play();
+      });
+
+      // Target lost → hide model, show overlay
+      targetEl.addEventListener('targetLost', () => {
+        scanOverlay.classList.remove('hidden');
+        modelEntity.setAttribute('visible', 'false');
+
+        const mixer = modelEntity.components['animation-mixer'];
+        if (mixer) mixer.pause();
+      });
+    </script>
+  </body>
+</html>
